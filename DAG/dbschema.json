@@ -1,0 +1,52 @@
+[
+  {
+    "mode": "NULLABLE",
+    "name": "0",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "1",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "2",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "3",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "4",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "5",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "6",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "7",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "8",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "9",
+    "type": "INTEGER"
+  }
+]
