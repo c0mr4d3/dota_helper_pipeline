@@ -1,10 +1,16 @@
 import base64
 import logging
-from pandas import DataFrame
+from pandas import DataFrame,Series
 import json
 from google.cloud.storage import Client
 import time
+import ast
 
+def flatten_hero_array(hero_arr):
+    flat_arr=[0]*135
+    for obj in ast.literal_eval(hero_arr):
+        flat_arr[obj-1]=1
+    return flat_arr
 
 class LoadToStorage:
     def __init__(self,event,context):
@@ -29,10 +35,15 @@ class LoadToStorage:
                 df.dropna(inplace=True)
                 df=df[(df["avg_mmr"])>=4000]
                 df.drop(df.columns[[0,1,3,4,5,6,7,8,9,10,11]],axis=1,inplace=True)
-            
+                df.drop_duplicates(inplace=True)
+                #df=DataFrame(df.apply(lambda x:[y for y in ast.literal_eval(x['radiant_team'])]+[y for y in ast.literal_eval(x['dire_team'])] if x['radiant_win'] \
+                #else [y for y in ast.literal_eval(x['dire_team'])]+[y for y in ast.literal_eval(x['radiant_team'])],axis=1).values.tolist())
+                df["vector"]=df.apply(lambda x:[int(x["radiant_win"])]+flatten_hero_array(x["radiant_team"])+flatten_hero_array(x["dire_team"]),axis=1)
+                df2=df["vector"].apply(Series)
+                df2=df2.rename(columns=lambda x: 'h'+str(x))
             else:
                 logging.info("Empty DF created")
-            return df
+            return df2
         except Exception as e:
             logging.error(f"Error creating DF {str(e)}")
             raise
