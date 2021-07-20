@@ -1,51 +1,60 @@
 from airflow.contrib.operators.bigquery_operator import BigQueryOperator
 from airflow.contrib.operators.gcs_to_bq import GoogleCloudStorageToBigQueryOperator
+#from airflow.providers.google.cloud.transfers.gcs_to_bigquery import GCSToBigQueryOperator
 from airflow.contrib.operators.gcs_to_gcs import GoogleCloudStorageToGoogleCloudStorageOperator
 from airflow.operators.dummy_operator import DummyOperator
+import json
 
-
-def _create_merge_sql(source, target, schema, **context):
-    columns = [item["name"] for item in schema]
-    columns = ",".join(columns)
+def _create_merge_sql(source, target, **context):
     return f"""
-        MERGE `{target}` T
-        USING `{source}` S
-        ON T.cdc_hash = TO_BASE64(MD5(TO_JSON_STRING(S)))
-        WHEN NOT MATCHED THEN
-          INSERT ({columns}, inserted_at, cdc_hash)
-          VALUES ({columns}, CURRENT_DATETIME(), TO_BASE64(MD5(TO_JSON_STRING(S))))
+        INSERT INTO `{target}`
+        SELECT * FROM `{source}`
+    """
+
+def _create_emptying_sql(source, **context):
+    return f"""
+        DELETE FROM `{source}`
+        WHERE true
     """
 
 
-def gc_tasks(schema, next_task=DummyOperator(task_id="Done")):
-    bq_staging = ""
-    bq_warehouse = f"{{{{ var.value.gc_project_id }}}}.{{{{ var.value.bq_dataset_target }}}}.{name}"
+def gcp_ops(next_task=DummyOperator(task_id="Done")):
+    bq_staging = "{{var.value.bigquery_staging}}"
+    bq_warehouse = "{{var.value.bigquery_warehouse}}"
 
     t1 = GoogleCloudStorageToBigQueryOperator(
         task_id="staging_matchdata",
-        bucket="dota-helper-bucket",
-        source_objects=["/high_skill_matches/high_mmr_*"],
+        bucket="{{var.value.gcp_bucket_id}}",
+        source_objects=["high_skill_matches/*.csv"],
         destination_project_dataset_table=bq_staging,
         write_disposition="WRITE_TRUNCATE",
-        schema_fields=schema,
+        create_disposition="CREATE_IF_NEEDED",
+        schema_object="{{var.value.gcp_match_schema}}",
         skip_leading_rows=1,
     )
 
     t2 = BigQueryOperator(
-        task_id="Load data to main warehouse",
-        sql=_create_merge_sql(bq_staging, bq_warehouse, schema),
+        task_id="Load_data_to_main_warehouse",
+        sql=_create_merge_sql(bq_staging, bq_warehouse),
         use_legacy_sql=False,
     )
 
-    t3 = GoogleCloudStorageToGoogleCloudStorageOperator(
-        task_id=f"move_{name}_to_processed",
-        source_bucket="{{var.value.gcs_bucket}}",
-        source_object=f"{name}*",
-        destination_bucket="{{var.value.gcs_bucket}}",
-        destination_object=f"processed/{name}",
+    
+    t3 = BigQueryOperator(
+        task_id="Empty_Staging_Table",
+        sql=_create_emptying_sql(bq_staging),
+        use_legacy_sql=False,
+    )
+
+    t4 = GoogleCloudStorageToGoogleCloudStorageOperator(
+        task_id="move_data_to_processed",
+        source_bucket="{{var.value.gcp_bucket_id}}",
+        source_object="high_skill_matches/",
+        destination_bucket="{{var.value.gcp_bucket_id}}",
+        destination_object="processed/",
         move_object=True,
     )
 
-    t1 >> t2 >> t3 >> next_task
+    t1 >> t2 >> t3 >> t4 >> next_task
 
     return t1
