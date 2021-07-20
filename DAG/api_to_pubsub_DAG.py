@@ -5,9 +5,9 @@ from requests import Session
 from google.cloud import pubsub_v1
 from concurrent import futures
 import json
-from datetime import datetime
-from datetime import timedelta
+from datetime import datetime,timedelta 
 import logging
+import pandas as pd
 
 default_args = {
     'start_date': airflow.utils.dates.days_ago(0),
@@ -18,13 +18,14 @@ default_args = {
 
 class PublishTopic:
     def __init__(self):
-        self.project_id = "var.value.gcp_project_id"
-        self.topic_id = "var.value.topic_id"
+        self.project_id = "sid-egen"
+        self.topic_id = "dota-data"
         self.publisher = pubsub_v1.PublisherClient()
         self.topic_path = self.publisher.topic_path(self.project_id,self.topic_id)
         self.publish_futures = []
         self.sess = Session()
         self.concat_data=""
+
 
     def getMatchData(self):
         logging.info("Starting ingestion")
@@ -66,12 +67,11 @@ class PublishTopic:
 
 def fetchMatchBatch():
     logging.basicConfig(level=logging.INFO)
-    
     logging.info("Started function")
     serv = PublishTopic()
     for i in range(60):
         serv.getMatchData()
-    logging.info("Batch Processed, Publushing to topic")
+    logging.info("Batch Processed, Publishing to topic")
     serv.pushToTopic()   
 
  
@@ -79,8 +79,9 @@ dag = DAG(
     'Dota_Api_to_Topic',
     default_args=default_args,
     description='Publish 1 Batch of data from Dota Api Fetcher',
-    schedule_interval=None,
-    dagrun_timeout=timedelta(minutes=20))
+    schedule_interval=timedelta(minutes=2),
+    dagrun_timeout=timedelta(minutes=5),
+    catchup=False)
 
 with dag:
 
